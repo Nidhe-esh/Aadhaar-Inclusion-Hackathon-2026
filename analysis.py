@@ -1,48 +1,77 @@
 import pandas as pd
-import glob
 import os
-import matplotlib.pyplot as plt
-import seaborn as sns
+import glob
 
-# Professional Data Aggregation Script for UIDAI Hackathon
 def run_analysis():
-    # 1. Load and Clean Data
-    csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
+    print("🚀 Starting Enhanced Data Processing...")
     
-    def aggregate_data(keyword):
-        files = [f for f in csv_files if keyword in f]
-        dfs = [pd.read_csv(f) for f in files]
-        if not dfs: return pd.DataFrame()
-        df = pd.concat(dfs, ignore_index=True)
-        df.columns = [c.strip().lower() for c in df.columns]
-        df['state'] = df['state'].str.upper()
-        df['district'] = df['district'].str.upper()
-        return df
+    # This version looks inside ALL subfolders recursively
+    csv_files = glob.glob("**/*.csv", recursive=True)
+    
+    # Filter out the 'processed' file if it already exists to avoid double-counting
+    csv_files = [f for f in csv_files if "processed_aadhaar_data" not in f]
+    
+    print(f"📂 Found {len(csv_files)} files across your folders.")
 
+    if len(csv_files) == 0:
+        print("❌ ERROR: No CSV files found! Check if they are in this folder or a subfolder.")
+        return
+
+    def aggregate_data(keyword):
+        target_files = [f for f in csv_files if keyword.lower() in f.lower()]
+        if not target_files:
+            print(f"⚠️ No files found for: {keyword}")
+            return pd.DataFrame()
+        
+        print(f"🔍 Processing {keyword} data from {len(target_files)} files...")
+        dfs = []
+        for f in target_files:
+            try:
+                temp_df = pd.read_csv(f)
+                temp_df.columns = [c.strip().lower() for c in temp_df.columns]
+                dfs.append(temp_df)
+            except Exception as e:
+                print(f"Could not read {f}: {e}")
+        
+        if not dfs: return pd.DataFrame()
+        full_df = pd.concat(dfs, ignore_index=True)
+        full_df['state'] = full_df['state'].astype(str).str.upper().str.strip()
+        full_df['district'] = full_df['district'].astype(str).str.upper().str.strip()
+        return full_df
+
+    # 1. Process
     enrol = aggregate_data('enrolment')
     bio = aggregate_data('biometric')
     demo = aggregate_data('demographic')
 
-    # 2. Join Datasets
-    master = enrol.groupby(['state', 'district']).sum().reset_index()
-    master = master.merge(bio.groupby(['state', 'district']).sum().reset_index(), on=['state', 'district'], how='outer')
-    master = master.merge(demo.groupby(['state', 'district']).sum().reset_index(), on=['state', 'district'], how='outer').fillna(0)
+    if enrol.empty:
+        print("❌ ERROR: Enrolment data is missing. Analysis cannot continue.")
+        return
 
-    # 3. Create Key Metrics
-    master['total_enrol'] = master['age_0_5'] + master['age_5_17'] + master['age_18_greater']
-    master['total_updates'] = master['bio_age_5_17'] + master['bio_age_17_'] + master['demo_age_5_17'] + master['demo_age_17_']
+    # 2. Merge
+    print("📊 Merging datasets into a Master Record...")
+    master = enrol.groupby(['state', 'district']).sum(numeric_only=True).reset_index()
+    
+    if not bio.empty:
+        bio_grouped = bio.groupby(['state', 'district']).sum(numeric_only=True).reset_index()
+        master = master.merge(bio_grouped, on=['state', 'district'], how='outer')
+    
+    if not demo.empty:
+        demo_grouped = demo.groupby(['state', 'district']).sum(numeric_only=True).reset_index()
+        master = master.merge(demo_grouped, on=['state', 'district'], how='outer')
+
+    master.fillna(0, inplace=True)
+
+    # 3. Winning Metrics
+    master['total_enrol'] = master.get('age_0_5', 0) + master.get('age_5_17', 0) + master.get('age_18_greater', 0)
+    master['total_updates'] = (master.get('bio_age_5_17', 0) + master.get('bio_age_17_', 0) + 
+                              master.get('demo_age_5_17', 0) + master.get('demo_age_17_', 0))
     master['vulnerability_score'] = (master['total_updates'] / (master['total_enrol'] + 1))
 
-    # 4. Generate Visuals
-    plt.figure(figsize=(10,6))
-    top_10 = master.sort_values('total_enrol', ascending=False).head(10)
-    sns.barplot(data=top_10, x='district', y='vulnerability_score')
-    plt.title('District-wise Service Intensity Score')
-    plt.xticks(rotation=45)
-    plt.savefig('visual_insight.png')
-    
-    master.to_csv('processed_aadhaar_data.csv', index=False)
-    print("Analysis Complete. Results saved to processed_aadhaar_data.csv")
+    # 4. Save to the main folder
+    output_name = 'processed_aadhaar_data.csv'
+    master.to_csv(output_name, index=False)
+    print(f"✅ SUCCESS: '{output_name}' created in your main folder!")
 
 if __name__ == "__main__":
     run_analysis()
