@@ -2,119 +2,147 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. PAGE SETUP & PURPOSE
+# 1. PAGE SETUP
 st.set_page_config(
-    page_title="Aadhaar Social Pulse | UIDAI 2026",
-    page_icon="🇮🇳",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Aadhaar Sentinel | UIDAI Data Intelligence",
+    page_icon="🛡️",
+    layout="wide"
 )
 
-# 2. THEME & UI ENHANCEMENTS (CSS)
-# This CSS handles the minimalist card borders and vibrant accents
+# 2. UI STYLING (Minimalist & Professional)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     
-    html, body, [class*="css"]  {
+    html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
     }
     
-    .stMetric {
-        border: 1px solid rgba(151, 151, 151, 0.2);
-        padding: 1.5rem;
-        border-radius: 15px;
-        background: rgba(255, 255, 255, 0.05);
+    /* Executive Briefing Box */
+    .mission-card {
+        background-color: #ffffff;
+        border: 1px solid #e1e4e8;
+        padding: 24px;
+        border-radius: 12px;
+        border-left: 6px solid #1a73e8;
+        margin-bottom: 25px;
     }
     
-    /* Vibrant Gradient for Title */
-    .hero-text {
-        background: linear-gradient(90deg, #007cf0, #00dfd8);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    .mission-title {
+        color: #1a73e8;
         font-weight: 800;
-        font-size: 3rem;
+        font-size: 1.2rem;
+        margin-bottom: 8px;
     }
-    
-    /* Purpose Box */
-    .purpose-container {
-        padding: 20px;
-        border-left: 5px solid #007cf0;
-        background-color: rgba(0, 124, 240, 0.05);
-        margin-bottom: 30px;
-        border-radius: 0 10px 10px 0;
+
+    /* Metric Styling */
+    [data-testid="stMetricValue"] {
+        font-weight: 700;
+        color: #1a73e8;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. SIDEBAR / THEME CONTROLS
-with st.sidebar:
-    st.image("https://uidai.gov.in/images/logo_uidai3.png", width=100)
-    st.markdown("## Navigation")
-    theme = st.radio("Choose Visual Mode", ["Vibrant Dark", "Clean Light"])
-    st.divider()
-    st.markdown("### Purpose")
-    st.caption("Monitoring Aadhaar lifecycle trends to ensure zero-exclusion in social welfare delivery.")
-
-# 4. DATA LOADING
+# 3. DATA LOADING
 @st.cache_data
 def load_data():
+    # Ensure this file exists in your GitHub repository
     return pd.read_csv('processed_aadhaar_data.csv')
 
 df = load_data()
 
-# 5. HERO SECTION (PURPOSE)
-st.markdown('<p class="hero-text">Aadhaar Social Pulse</p>', unsafe_allow_html=True)
-st.markdown("""
-    <div class="purpose-container">
-        <strong>Mission:</strong> To identify geographic clusters at risk of benefit exclusion due to lagging 
-        Mandatory Biometric Updates (MBU) and to track the socio-economic pulse of internal migration.
+# 4. SIDEBAR - CONTROL CENTER (City/District Selection)
+with st.sidebar:
+    st.markdown("## **Control Center**")
+    st.caption("Filter parameters for deep-dive analysis.")
+    
+    # State Selection
+    states = sorted(df['state'].unique())
+    selected_state = st.selectbox("Select State", ["All India"] + states)
+    
+    # District/City Selection (Dynamic based on State)
+    if selected_state != "All India":
+        districts = sorted(df[df['state'] == selected_state]['district'].unique())
+        selected_district = st.selectbox("Select District/City", ["All Districts"] + districts)
+    else:
+        selected_district = "All Districts"
+    
+    st.divider()
+    st.caption("UIDAI Hackathon 2026 | Analytical Framework v2.0")
+
+# 5. DATA FILTERING LOGIC
+filtered_df = df.copy()
+if selected_state != "All India":
+    filtered_df = filtered_df[filtered_df['state'] == selected_state]
+if selected_district != "All Districts":
+    filtered_df = filtered_df[filtered_df['district'] == selected_district]
+
+# 6. HEADER & STRATEGIC MISSION
+st.title("🛡️ Aadhaar Sentinel")
+st.markdown(f"""
+    <div class="mission-card">
+        <div class="mission-title">EXECUTIVE STRATEGIC BRIEFING</div>
+        <p style="color: #444; line-height: 1.6;">
+            <strong>Objective:</strong> To maintain the integrity of India's digital identity backbone by identifying 
+            <strong>exclusion vulnerabilities</strong>. This framework monitors the delta between historical child enrolments 
+            and mandatory biometric refreshes, ensuring continuous welfare access for <strong>{selected_district if selected_district != 'All Districts' else 'Nationwide'}</strong> clusters.
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
-# 6. KPI DASHBOARD (VIBRANT METRICS)
+# 7. PERFORMANCE METRICS
 m1, m2, m3, m4 = st.columns(4)
 with m1:
-    st.metric("Districts Active", len(df), help="Total unique districts analyzed")
+    st.metric("Districts Analyzed", len(filtered_df))
 with m2:
-    st.metric("Update Volume", f"{int(df['total_updates'].sum()):,}", "↑ 12%")
+    updates = int(filtered_df['total_updates'].sum())
+    st.metric("Service Volume", f"{updates:,}")
 with m3:
-    critical = len(df[df['vulnerability_score'] < 500])
-    st.metric("Exclusion Risks", critical, delta="-2", delta_color="inverse")
+    risk_score = round(filtered_df['vulnerability_score'].mean(), 2)
+    st.metric("Maintenance Index", risk_score)
 with m4:
-    st.metric("System Health", "98.4%", "Stable")
+    # Logic for System Health
+    health = "Stable" if risk_score > 100 else "Critical"
+    st.metric("System Health", health)
 
 st.divider()
 
-# 7. MAIN ANALYSIS (MINIMALIST PLOTS)
-tab1, tab2 = st.tabs(["🎯 Exclusion Analytics", "🚚 Migration Trends"])
+# 8. CORE ANALYTICS
+tab1, tab2 = st.tabs(["🎯 Exclusion Analytics", "📁 District Data Explorer"])
 
 with tab1:
-    st.markdown("### Regional Vulnerability Index")
-    # Using a vibrant color scale (Plasma or Viridis)
-    fig = px.scatter(
-        df, x="total_enrol", y="total_updates", size="vulnerability_score",
-        color="vulnerability_score", hover_name="district",
-        log_x=True, log_y=True,
-        color_continuous_scale='Plasma',
-        template="plotly_dark" if theme == "Vibrant Dark" else "plotly_white"
-    )
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=40))
-    st.plotly_chart(fig, use_container_width=True)
+    col_left, col_right = st.columns([2, 1])
+    
+    with col_left:
+        st.markdown("### **Vulnerability Mapping**")
+        fig = px.scatter(
+            filtered_df, x="total_enrol", y="total_updates", size="vulnerability_score",
+            color="vulnerability_score", hover_name="district",
+            log_x=True, log_y=True,
+            color_continuous_scale='RdBu', # Professional Red-Blue scale
+            template="plotly_white"
+        )
+        fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_right:
+        st.markdown("### **Top Priority Nodes**")
+        # Showing top 5 districts in current filter needing attention
+        top_5 = filtered_df.sort_values('vulnerability_score').head(5)
+        st.dataframe(top_5[['district', 'vulnerability_score']], hide_index=True, use_container_width=True)
+        st.caption("Districts with the lowest maintenance ratios.")
 
 with tab2:
-    st.markdown("### Top Migration Hubs")
-    top_10 = df.sort_values('vulnerability_score', ascending=False).head(10)
-    fig2 = px.bar(
-        top_10, x='vulnerability_score', y='district', orientation='h',
-        color='vulnerability_score', color_continuous_scale='Viridis',
-        template="plotly_dark" if theme == "Vibrant Dark" else "plotly_white"
-    )
-    st.plotly_chart(fig2, use_container_width=True)
+    st.markdown("### **Master Records**")
+    st.dataframe(filtered_df, use_container_width=True, hide_index=True)
 
-# 8. THE "X-FACTOR" (PREDICTIVE RECOMMENDATION)
+# 9. AI PREDICTIVE RECOMMENDATION (The X-Factor)
 st.divider()
 st.subheader("🤖 Predictive Governance Action")
-priority = df.sort_values('vulnerability_score').iloc[0]
-st.warning(f"**Priority Alert:** District **{priority['district']}** is showing a significant drop in mandatory updates.")
-st.info(f"**Insight:** Recommend dispatching 2 Mobile Aadhaar Units and starting a localized SMS awareness campaign.")
+
+if not filtered_df.empty:
+    priority = filtered_df.sort_values('vulnerability_score').iloc[0]
+    st.warning(f"**High Priority:** District **{priority['district']}** is identified as a primary exclusion risk.")
+    st.info(f"**Recommended Response:** Deploy 2 Mobile Aadhaar Units to this district to facilitate Mandatory Biometric Updates (MBU) for the 5-15 age cohort.")
+else:
+    st.error("No data available for the selected filters.")
